@@ -1,0 +1,1555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UCTP Parser — Dataset Pipeline Inspector</title>
+  <meta name="description" content="Interactive frontend for the ITC-2007 UCTP dataset parser. Visualises the full parsing pipeline for Early, Hidden, and Late benchmark datasets.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    /* ======================== RESET & ROOT ======================== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-void:    #080c0e;
+      --bg-deep:    #0d1315;
+      --bg-mid:     #111a1c;
+      --bg-surface: rgba(20, 30, 32, 0.75);
+      --border:     rgba(16, 185, 129, 0.1);
+      --border-md:  rgba(16, 185, 129, 0.22);
+      --border-hi:  rgba(16, 185, 129, 0.45);
+
+      --emerald:    #10b981;
+      --emerald-lo: rgba(16, 185, 129, 0.08);
+      --emerald-md: rgba(16, 185, 129, 0.18);
+      --emerald-glow: rgba(16, 185, 129, 0.32);
+      --mint:       #a7f3d0;
+      --cyan:       #22d3ee;
+      --cyan-lo:    rgba(34, 211, 238, 0.08);
+      --amber:      #f59e0b;
+      --amber-lo:   rgba(245, 158, 11, 0.1);
+      --rose:       #f87171;
+      --rose-lo:    rgba(248, 113, 113, 0.1);
+      --indigo:     #818cf8;
+      --indigo-lo:  rgba(129, 140, 248, 0.1);
+
+      --text-primary:   #e8f1f0;
+      --text-secondary: #8fa8a5;
+      --text-muted:     #5a7472;
+
+      --font-ui:   'Outfit', sans-serif;
+      --font-body: 'Inter', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      --radius-xl: 18px;
+
+      --shadow-card: 0 2px 24px rgba(0,0,0,0.5), 0 0 0 1px var(--border);
+      --shadow-glow: 0 0 32px var(--emerald-glow);
+      --ease: cubic-bezier(0.4, 0, 0.2, 1);
+      --dur: 0.25s;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font-body);
+      background-color: var(--bg-void);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+      line-height: 1.65;
+      background-image:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(16,185,129,0.06) 0%, transparent 70%),
+        radial-gradient(ellipse 60% 40% at 80% 100%, rgba(34,211,238,0.03) 0%, transparent 60%);
+      background-attachment: fixed;
+    }
+
+    h1,h2,h3,h4 { font-family: var(--font-ui); letter-spacing: -0.01em; }
+
+    /* scrollbar */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(16,185,129,0.15); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(16,185,129,0.3); }
+
+    /* ======================== LAYOUT ======================== */
+    .page-wrap {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 0 2rem 4rem;
+    }
+
+    /* ======================== TOPBAR ======================== */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.25rem 0;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 2.5rem;
+      position: sticky;
+      top: 0;
+      background: rgba(8, 12, 14, 0.92);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      z-index: 100;
+    }
+    .topbar-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .brand-icon {
+      width: 38px; height: 38px;
+      background: linear-gradient(135deg, var(--emerald) 0%, var(--cyan) 100%);
+      border-radius: var(--radius-md);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 0 16px var(--emerald-glow);
+    }
+    .brand-icon svg { width: 20px; height: 20px; color: #fff; }
+    .brand-title {
+      font-family: var(--font-ui);
+      font-size: 1.25rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #ffffff 40%, var(--mint) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .brand-sub {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      margin-top: 1px;
+    }
+    .topbar-actions { display: flex; gap: 0.75rem; align-items: center; }
+    .btn-ghost {
+      display: flex; align-items: center; gap: 0.45rem;
+      background: var(--emerald-lo);
+      border: 1px solid var(--border);
+      color: var(--emerald);
+      text-decoration: none;
+      padding: 0.45rem 1rem;
+      border-radius: var(--radius-md);
+      font-family: var(--font-ui);
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--dur) var(--ease);
+    }
+    .btn-ghost svg { width: 15px; height: 15px; }
+    .btn-ghost:hover {
+      background: var(--emerald-md);
+      border-color: var(--border-md);
+      transform: translateX(-2px);
+      box-shadow: 0 0 14px var(--emerald-glow);
+    }
+    .status-badge {
+      display: flex; align-items: center; gap: 0.4rem;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      padding: 0.3rem 0.75rem;
+      background: rgba(0,0,0,0.25);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+    }
+    .status-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--text-muted);
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+    .status-dot.ready { background: var(--emerald); }
+    .status-dot.parsing { background: var(--amber); }
+    .status-dot.done { background: var(--cyan); }
+    @keyframes pulse-dot {
+      0%,100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* ======================== MAIN GRID ======================== */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 1.75rem;
+      align-items: start;
+    }
+
+    /* ======================== GLASS CARD ======================== */
+    .card {
+      background: var(--bg-surface);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.4rem;
+      box-shadow: var(--shadow-card);
+      transition: border-color var(--dur) var(--ease);
+    }
+    .card:hover { border-color: var(--border-md); }
+
+    .card-title {
+      display: flex; align-items: center; gap: 0.55rem;
+      font-size: 0.95rem; font-weight: 700;
+      color: #ffffff; margin-bottom: 1.1rem;
+    }
+    .card-title svg { width: 16px; height: 16px; color: var(--emerald); flex-shrink: 0; }
+    .card-sub { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
+
+    /* ======================== LEFT PANEL ======================== */
+    .left-panel { display: flex; flex-direction: column; gap: 1.25rem; }
+
+    /* ======================== DATASET CATEGORY TABS ======================== */
+    .category-tabs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.4rem;
+      background: rgba(0,0,0,0.25);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 0.3rem;
+      margin-bottom: 1.1rem;
+    }
+    .cat-tab {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 0.55rem 0.3rem;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-ui);
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--dur) var(--ease);
+      text-align: center;
+    }
+    .cat-tab:hover { color: var(--text-primary); }
+    .cat-tab.active {
+      color: #ffffff;
+      background: var(--emerald-md);
+      border: 1px solid var(--border-md);
+    }
+    .cat-tab.early.active { background: rgba(16,185,129,0.18); border-color: rgba(16,185,129,0.3); }
+    .cat-tab.late.active { background: rgba(245,158,11,0.14); border-color: rgba(245,158,11,0.28); color: var(--amber); }
+    .cat-tab.dataset-hidden.active { background: rgba(129,140,248,0.14); border-color: rgba(129,140,248,0.28); color: var(--indigo); }
+
+    /* ======================== DROP ZONE ======================== */
+    .drop-zone {
+      border: 2px dashed var(--border-md);
+      border-radius: var(--radius-md);
+      padding: 2rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all var(--dur) var(--ease);
+      position: relative;
+      overflow: hidden;
+    }
+    .drop-zone::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at center, var(--emerald-lo) 0%, transparent 70%);
+      opacity: 0;
+      transition: opacity var(--dur) var(--ease);
+    }
+    .drop-zone:hover::before, .drop-zone.dragover::before { opacity: 1; }
+    .drop-zone:hover { border-color: var(--emerald); }
+    .drop-zone.dragover { border-color: var(--emerald); box-shadow: 0 0 20px var(--emerald-glow); }
+    .drop-zone svg { width: 36px; height: 36px; color: var(--emerald); margin-bottom: 0.75rem; transition: transform var(--dur) var(--ease); }
+    .drop-zone:hover svg { transform: translateY(-3px); }
+    .drop-zone p { font-size: 0.8rem; color: var(--text-muted); line-height: 1.5; }
+    .drop-zone b { color: var(--text-primary); }
+    .drop-zone .format-chips { display: flex; justify-content: center; gap: 0.4rem; margin-top: 0.6rem; }
+    .fmt-chip {
+      background: var(--emerald-lo); border: 1px solid var(--border);
+      color: var(--emerald); padding: 0.15rem 0.5rem;
+      border-radius: 4px; font-size: 0.7rem; font-family: var(--font-mono);
+    }
+
+    /* ======================== FILE QUEUE ======================== */
+    .file-queue { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
+    .file-item {
+      display: flex; align-items: center; gap: 0.6rem;
+      background: rgba(0,0,0,0.2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0.55rem 0.75rem;
+      transition: all var(--dur) var(--ease);
+    }
+    .file-item.active { border-color: var(--border-md); background: var(--emerald-lo); }
+    .file-item.error { border-color: rgba(248,113,113,0.3); background: var(--rose-lo); }
+    .file-item-icon { flex-shrink: 0; }
+    .file-item-icon svg { width: 14px; height: 14px; }
+    .file-item-icon.ok svg { color: var(--emerald); }
+    .file-item-icon.err svg { color: var(--rose); }
+    .file-item-icon.pend svg { color: var(--text-muted); }
+    .file-name { font-size: 0.78rem; font-family: var(--font-mono); color: var(--text-primary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .file-size { font-size: 0.68rem; color: var(--text-muted); flex-shrink: 0; }
+    .file-btn {
+      background: transparent; border: none; cursor: pointer;
+      color: var(--text-muted); padding: 2px; transition: color var(--dur);
+    }
+    .file-btn svg { width: 13px; height: 13px; }
+    .file-btn:hover { color: var(--emerald); }
+
+    /* ======================== ACTION BUTTON ======================== */
+    .parse-btn {
+      width: 100%;
+      display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+      background: linear-gradient(135deg, var(--emerald) 0%, #0d9488 100%);
+      border: none; border-radius: var(--radius-md);
+      color: #fff;
+      font-family: var(--font-ui); font-size: 0.9rem; font-weight: 700;
+      padding: 0.75rem;
+      cursor: pointer;
+      transition: all var(--dur) var(--ease);
+      box-shadow: 0 4px 20px var(--emerald-glow);
+    }
+    .parse-btn svg { width: 16px; height: 16px; }
+    .parse-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 28px var(--emerald-glow); }
+    .parse-btn:active { transform: translateY(0); }
+    .parse-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    /* ======================== MINI STATS ======================== */
+    .stats-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 0.55rem; }
+    .stat-cell {
+      background: rgba(0,0,0,0.2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0.7rem;
+      text-align: center;
+    }
+    .stat-label { font-size: 0.67rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+    .stat-value { font-size: 1.25rem; font-weight: 700; color: var(--mint); margin-top: 0.15rem; font-family: var(--font-ui); }
+
+    /* ======================== PARSER LOG ======================== */
+    .log-panel {
+      font-family: var(--font-mono);
+      font-size: 0.73rem;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 0.9rem;
+      color: var(--text-muted);
+      max-height: 200px;
+      overflow-y: auto;
+      line-height: 1.7;
+    }
+    .log-line { display: flex; gap: 0.5rem; }
+    .log-time { color: var(--text-muted); flex-shrink: 0; }
+    .log-msg { }
+    .log-line.info .log-msg { color: var(--text-secondary); }
+    .log-line.success .log-msg { color: var(--emerald); }
+    .log-line.warn .log-msg { color: var(--amber); }
+    .log-line.error .log-msg { color: var(--rose); }
+    .log-line.step .log-msg { color: var(--cyan); }
+
+    /* ======================== PIPELINE VISUALISER ======================== */
+    .pipeline-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      padding: 1.25rem 0;
+      overflow-x: auto;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+    }
+    .pipe-stage {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 0.45rem;
+      flex: 1;
+      position: relative;
+    }
+    .pipe-stage:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      top: 22px;
+      left: calc(50% + 22px);
+      width: calc(100% - 44px);
+      height: 2px;
+      background: var(--border);
+      transition: background 0.5s ease;
+    }
+    .pipe-stage.done:not(:last-child)::after { background: var(--emerald); }
+    .pipe-stage.active:not(:last-child)::after {
+      background: linear-gradient(90deg, var(--emerald), var(--border));
+      animation: pipe-flow 1.2s linear infinite;
+    }
+    @keyframes pipe-flow {
+      0% { background-position: 0% 50%; }
+      100% { background-position: 100% 50%; }
+    }
+    .pipe-node {
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.3);
+      border: 2px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.4s var(--ease);
+    }
+    .pipe-node svg { width: 18px; height: 18px; color: var(--text-muted); transition: color 0.4s; }
+    .pipe-stage.done .pipe-node { border-color: var(--emerald); background: var(--emerald-lo); }
+    .pipe-stage.done .pipe-node svg { color: var(--emerald); }
+    .pipe-stage.active .pipe-node {
+      border-color: var(--amber);
+      background: var(--amber-lo);
+      box-shadow: 0 0 12px rgba(245,158,11,0.4);
+      animation: node-pulse 0.9s ease-in-out infinite;
+    }
+    .pipe-stage.active .pipe-node svg { color: var(--amber); }
+    @keyframes node-pulse {
+      0%,100% { transform: scale(1); }
+      50% { transform: scale(1.06); }
+    }
+    .pipe-label {
+      font-size: 0.68rem; font-family: var(--font-ui); font-weight: 600;
+      color: var(--text-muted); text-align: center; line-height: 1.3;
+      transition: color 0.4s;
+    }
+    .pipe-stage.done .pipe-label { color: var(--emerald); }
+    .pipe-stage.active .pipe-label { color: var(--amber); }
+    .pipe-percent {
+      font-size: 0.65rem; font-family: var(--font-mono);
+      color: var(--text-muted); transition: color 0.4s;
+    }
+    .pipe-stage.done .pipe-percent { color: var(--emerald); }
+    .pipe-stage.active .pipe-percent { color: var(--amber); }
+
+    /* ======================== TAB NAVIGATION ======================== */
+    .tabs-nav {
+      display: flex; gap: 0.35rem;
+      background: rgba(0,0,0,0.25);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 0.28rem;
+      margin-bottom: 1.5rem;
+      overflow-x: auto;
+    }
+    .tab-btn {
+      display: flex; align-items: center; gap: 0.4rem;
+      background: transparent; border: none;
+      color: var(--text-muted);
+      padding: 0.5rem 0.9rem;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-ui); font-size: 0.82rem; font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all var(--dur) var(--ease);
+    }
+    .tab-btn svg { width: 13px; height: 13px; }
+    .tab-btn:hover { color: var(--text-primary); }
+    .tab-btn.active { color: #fff; background: var(--emerald-md); border: 1px solid var(--border-md); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; animation: fade-in 0.25s ease; }
+    @keyframes fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+    /* ======================== DATA TABLE ======================== */
+    .table-wrap {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      background: rgba(0,0,0,0.12);
+    }
+    .table-scroll { max-height: 480px; overflow-y: auto; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    thead th {
+      background: rgba(16,185,129,0.07);
+      color: var(--mint);
+      font-family: var(--font-ui); font-weight: 600; font-size: 0.75rem;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 5;
+      text-align: left;
+    }
+    tbody td {
+      padding: 0.7rem 1rem;
+      border-bottom: 1px solid rgba(16,185,129,0.04);
+      vertical-align: middle;
+    }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover td { background: rgba(16,185,129,0.025); }
+    .td-id { font-weight: 600; color: #ffffff; font-family: var(--font-mono); font-size: 0.78rem; }
+
+    /* ======================== CHIPS ======================== */
+    .chip {
+      display: inline-block;
+      background: var(--emerald-lo); border: 1px solid var(--border-md);
+      color: var(--emerald);
+      padding: 0.12rem 0.45rem; border-radius: 4px;
+      font-size: 0.7rem; font-family: var(--font-mono);
+    }
+    .chip.banned {
+      background: var(--rose-lo); border-color: rgba(248,113,113,0.25);
+      color: var(--rose);
+    }
+    .chip.room { background: var(--cyan-lo); border-color: rgba(34,211,238,0.2); color: var(--cyan); }
+    .chip.cur { background: var(--indigo-lo); border-color: rgba(129,140,248,0.2); color: var(--indigo); }
+    .chips-wrap { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+
+    /* ======================== EMPTY STATE ======================== */
+    .empty-state {
+      display: flex; flex-direction: column; align-items: center;
+      padding: 4rem 2rem; text-align: center; gap: 0.75rem;
+    }
+    .empty-icon { width: 56px; height: 56px; opacity: 0.25; }
+    .empty-title { font-size: 1rem; font-weight: 700; color: #ffffff; }
+    .empty-desc { font-size: 0.82rem; color: var(--text-muted); max-width: 380px; }
+
+    /* ======================== DATASET FOLDER MANAGER ======================== */
+    .folder-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+    .folder-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 1.1rem;
+      transition: all var(--dur) var(--ease);
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+    .folder-card::before {
+      content: '';
+      position: absolute; inset: 0;
+      opacity: 0;
+      transition: opacity var(--dur);
+    }
+    .folder-card.early { background: rgba(16,185,129,0.04); }
+    .folder-card.early::before { background: radial-gradient(ellipse at top left, rgba(16,185,129,0.08) 0%, transparent 70%); }
+    .folder-card.late { background: rgba(245,158,11,0.04); }
+    .folder-card.late::before { background: radial-gradient(ellipse at top left, rgba(245,158,11,0.08) 0%, transparent 70%); }
+    .folder-card.dataset-hidden { background: rgba(129,140,248,0.04); }
+    .folder-card.dataset-hidden::before { background: radial-gradient(ellipse at top left, rgba(129,140,248,0.08) 0%, transparent 70%); }
+    .folder-card:hover::before { opacity: 1; }
+    .folder-card.early:hover { border-color: rgba(16,185,129,0.35); }
+    .folder-card.late:hover { border-color: rgba(245,158,11,0.35); }
+    .folder-card.dataset-hidden:hover { border-color: rgba(129,140,248,0.35); }
+    .folder-label {
+      font-family: var(--font-ui); font-size: 0.8rem; font-weight: 700;
+      margin-bottom: 0.4rem;
+    }
+    .folder-card.early .folder-label { color: var(--emerald); }
+    .folder-card.late .folder-label { color: var(--amber); }
+    .folder-card.dataset-hidden .folder-label { color: var(--indigo); }
+    .folder-desc { font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.7rem; }
+    .folder-file-list { display: flex; flex-direction: column; gap: 0.3rem; max-height: 100px; overflow-y: auto; }
+    .folder-file-entry {
+      display: flex; align-items: center; gap: 0.4rem;
+      font-size: 0.7rem; font-family: var(--font-mono); color: var(--text-secondary);
+    }
+    .folder-file-entry svg { width: 11px; height: 11px; flex-shrink: 0; }
+    .folder-file-entry.loaded svg { color: var(--emerald); }
+    .folder-add-btn {
+      display: flex; align-items: center; justify-content: center; gap: 0.4rem;
+      width: 100%; margin-top: 0.75rem;
+      background: transparent;
+      border: 1px dashed var(--border-md);
+      border-radius: var(--radius-sm);
+      color: var(--text-muted);
+      font-family: var(--font-ui); font-size: 0.75rem; font-weight: 600;
+      padding: 0.45rem;
+      cursor: pointer;
+      transition: all var(--dur) var(--ease);
+    }
+    .folder-add-btn svg { width: 13px; height: 13px; }
+    .folder-card.early .folder-add-btn:hover { color: var(--emerald); border-color: rgba(16,185,129,0.4); }
+    .folder-card.late .folder-add-btn:hover { color: var(--amber); border-color: rgba(245,158,11,0.4); }
+    .folder-card.dataset-hidden .folder-add-btn:hover { color: var(--indigo); border-color: rgba(129,140,248,0.4); }
+    .folder-count {
+      position: absolute; top: 0.7rem; right: 0.7rem;
+      font-size: 0.65rem; font-family: var(--font-mono);
+      background: rgba(0,0,0,0.3); border: 1px solid var(--border);
+      padding: 0.1rem 0.4rem; border-radius: 999px;
+      color: var(--text-muted);
+    }
+
+    /* ======================== MULTI-FILE COMPARE ======================== */
+    .compare-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+    .compare-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 1rem;
+      background: rgba(0,0,0,0.15);
+      cursor: pointer;
+      transition: all var(--dur) var(--ease);
+    }
+    .compare-card:hover { border-color: var(--border-md); background: var(--emerald-lo); }
+    .compare-card.active { border-color: var(--emerald); background: var(--emerald-lo); }
+    .compare-card-name { font-family: var(--font-mono); font-size: 0.78rem; color: #fff; font-weight: 600; margin-bottom: 0.5rem; }
+    .compare-meta { font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.6rem; }
+    .compare-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 0.4rem; }
+    .cmp-stat { text-align: center; }
+    .cmp-stat-val { font-size: 0.88rem; font-weight: 700; font-family: var(--font-ui); color: var(--mint); }
+    .cmp-stat-lbl { font-size: 0.6rem; text-transform: uppercase; color: var(--text-muted); }
+    .category-tag {
+      display: inline-block; font-size: 0.62rem; font-weight: 700;
+      padding: 0.1rem 0.4rem; border-radius: 3px;
+      font-family: var(--font-mono); margin-bottom: 0.35rem;
+    }
+    .category-tag.early { background: var(--emerald-lo); color: var(--emerald); border: 1px solid rgba(16,185,129,0.25); }
+    .category-tag.late { background: var(--amber-lo); color: var(--amber); border: 1px solid rgba(245,158,11,0.25); }
+    .category-tag.dataset-hidden { background: var(--indigo-lo); color: var(--indigo); border: 1px solid rgba(129,140,248,0.25); }
+
+    /* ======================== PROGRESS BAR ======================== */
+    .progress-outer {
+      height: 3px; background: rgba(0,0,0,0.3);
+      border-radius: 999px; overflow: hidden; margin: 0.75rem 0;
+    }
+    .progress-inner {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, var(--emerald), var(--cyan));
+      border-radius: 999px;
+      transition: width 0.4s var(--ease);
+    }
+
+    /* ======================== SETTINGS GRID ======================== */
+    .settings-big-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; margin-bottom: 1.5rem; }
+    .setting-block {
+      background: rgba(0,0,0,0.2); border: 1px solid var(--border);
+      border-radius: var(--radius-md); padding: 1.25rem;
+      text-align: center;
+    }
+    .setting-val { font-size: 2.5rem; font-weight: 800; font-family: var(--font-ui); color: var(--mint); line-height: 1; margin-bottom: 0.3rem; }
+    .setting-lbl { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+
+    /* ======================== RAW FORMAT PANEL ======================== */
+    .raw-block {
+      font-family: var(--font-mono); font-size: 0.72rem;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 1rem;
+      max-height: 250px;
+      overflow: auto;
+      color: var(--text-secondary);
+      line-height: 1.8;
+      white-space: pre;
+    }
+    .raw-kw { color: var(--cyan); }
+    .raw-num { color: var(--amber); }
+    .raw-str { color: var(--mint); }
+    .raw-comment { color: var(--text-muted); }
+
+    /* ======================== RESPONSIVE ======================== */
+    @media (max-width: 900px) {
+      .main-grid { grid-template-columns: 1fr; }
+      .folder-grid { grid-template-columns: 1fr; }
+      .settings-big-grid { grid-template-columns: repeat(3,1fr); }
+    }
+
+    /* ======================== UTILS ======================== */
+    .mb-1 { margin-bottom: 0.75rem; }
+    .mb-2 { margin-bottom: 1.25rem; }
+    .mt-1 { margin-top: 0.75rem; }
+    .gap-sm { gap: 0.5rem; }
+    .hidden { display: none !important; }
+    .flex { display: flex; }
+    .items-center { align-items: center; }
+    .justify-between { justify-content: space-between; }
+    .text-xs { font-size: 0.75rem; }
+    .text-muted { color: var(--text-muted); }
+    .font-mono { font-family: var(--font-mono); }
+    .divider { border: none; border-top: 1px solid var(--border); margin: 1.1rem 0; }
+    .row-count {
+      font-size: 0.7rem; font-family: var(--font-mono);
+      color: var(--text-muted); margin-top: 0.5rem;
+    }
+
+    /* Spin animation */
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .spinning { animation: spin 0.8s linear infinite; }
+  </style>
+</head>
+<body>
+
+<div class="page-wrap">
+
+  <!-- ══ TOPBAR ══════════════════════════════════════════════════ -->
+  <header class="topbar">
+    <div class="topbar-brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+      </div>
+      <div>
+        <div class="brand-title">UCTP Parser Inspector</div>
+        <div class="brand-sub">ITC-2007 Track 2 · Dataset Pipeline Visualiser</div>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <div class="status-badge">
+        <div class="status-dot" id="status-dot"></div>
+        <span id="status-text">Idle — awaiting input</span>
+      </div>
+      <a href="/" class="btn-ghost">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+        Dashboard
+      </a>
+    </div>
+  </header>
+
+  <!-- ══ MAIN GRID ════════════════════════════════════════════════ -->
+  <div class="main-grid">
+
+    <!-- ══ LEFT PANEL ══════════════════════════════════════════════ -->
+    <aside class="left-panel">
+
+      <!-- Upload Card -->
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Load Dataset(s)
+        </div>
+
+        <!-- Category selector -->
+        <div class="category-tabs">
+          <button class="cat-tab early active" data-cat="early" id="catTab-early">🌱 Early</button>
+          <button class="cat-tab late" data-cat="late" id="catTab-late">🌆 Late</button>
+          <button class="cat-tab dataset-hidden" data-cat="hidden" id="catTab-hidden">🔮 Hidden</button>
+        </div>
+
+        <!-- Drop zone -->
+        <div class="drop-zone" id="drop-zone">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><line x1="8" y1="9" x2="10" y2="9"/></svg>
+          <p>Drag &amp; drop <b>.tim</b>, <b>.csv</b>, or <b>.json</b> files<br>or click to browse multiple files</p>
+          <div class="format-chips">
+            <span class="fmt-chip">.tim</span>
+            <span class="fmt-chip">.json</span>
+            <span class="fmt-chip">.csv</span>
+          </div>
+          <input type="file" id="file-input" style="display:none;" accept=".tim,.json,.csv" multiple>
+        </div>
+
+        <!-- File Queue -->
+        <div class="file-queue" id="file-queue"></div>
+
+        <!-- Progress -->
+        <div class="progress-outer mt-1" id="prog-outer" style="display:none;">
+          <div class="progress-inner" id="prog-bar"></div>
+        </div>
+
+        <!-- Parse button -->
+        <button class="parse-btn mt-1" id="parse-btn" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Parse Selected Files
+        </button>
+      </div>
+
+      <!-- Quick Stats -->
+      <div class="card" id="stats-card" style="display:none;">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          <span id="stats-card-title">Instance Summary</span>
+        </div>
+        <div class="stats-grid" id="stats-grid"></div>
+      </div>
+
+      <!-- Parser Log Console -->
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          Parser Console
+        </div>
+        <div class="log-panel" id="log-panel">
+          <div class="log-line info"><span class="log-time">00:00:00</span><span class="log-msg">[init] UCTP Parser Inspector initialised. Awaiting file input...</span></div>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- ══ RIGHT PANEL ══════════════════════════════════════════════ -->
+    <main>
+
+      <!-- Pipeline Visualiser -->
+      <div class="card mb-2">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          Parse Pipeline
+          <span class="card-sub" style="font-family:var(--font-mono); margin-left:auto;" id="pipeline-status-txt">Waiting for file...</span>
+        </div>
+        <div class="pipeline-wrap" id="pipeline-wrap">
+          <div class="pipe-stage" id="pstage-0">
+            <div class="pipe-node"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/></svg></div>
+            <div class="pipe-label">File<br>Read</div>
+            <div class="pipe-percent" id="pp-0">—</div>
+          </div>
+          <div class="pipe-stage" id="pstage-1">
+            <div class="pipe-node"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></div>
+            <div class="pipe-label">Header<br>Parse</div>
+            <div class="pipe-percent" id="pp-1">—</div>
+          </div>
+          <div class="pipe-stage" id="pstage-2">
+            <div class="pipe-node"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/></svg></div>
+            <div class="pipe-label">Matrix<br>Extract</div>
+            <div class="pipe-percent" id="pp-2">—</div>
+          </div>
+          <div class="pipe-stage" id="pstage-3">
+            <div class="pipe-node"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+            <div class="pipe-label">Entity<br>Build</div>
+            <div class="pipe-percent" id="pp-3">—</div>
+          </div>
+          <div class="pipe-stage" id="pstage-4">
+            <div class="pipe-node"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+            <div class="pipe-label">Constraint<br>Map</div>
+            <div class="pipe-percent" id="pp-4">—</div>
+          </div>
+          <div class="pipe-stage" id="pstage-5">
+            <div class="pipe-node"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <div class="pipe-label">Instance<br>Ready</div>
+            <div class="pipe-percent" id="pp-5">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dataset Folder Manager -->
+      <div class="card mb-2" id="folder-manager-card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          Dataset Folder Manager
+          <span class="card-sub" style="margin-left:auto; font-size:0.72rem;">Add files to Early / Late / Hidden categories</span>
+        </div>
+        <div class="folder-grid" id="folder-grid">
+          <!-- Early -->
+          <div class="folder-card early" id="fcard-early">
+            <span class="folder-count" id="fcount-early">0 files</span>
+            <div class="folder-label">🌱 Early Dataset</div>
+            <div class="folder-desc">5,000 eval budget · comp-2007-2-1 to 2-8</div>
+            <div class="folder-file-list" id="flist-early"></div>
+            <button class="folder-add-btn" id="fadd-early" data-cat="early">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+              Add .tim files
+            </button>
+            <input type="file" id="finput-early" style="display:none;" accept=".tim,.json,.csv" multiple>
+          </div>
+          <!-- Late -->
+          <div class="folder-card late" id="fcard-late">
+            <span class="folder-count" id="fcount-late">0 files</span>
+            <div class="folder-label">🌆 Late Dataset</div>
+            <div class="folder-desc">10,000 eval budget · comp-2007-2-9 to 2-16</div>
+            <div class="folder-file-list" id="flist-late"></div>
+            <button class="folder-add-btn" id="fadd-late" data-cat="late">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+              Add .tim files
+            </button>
+            <input type="file" id="finput-late" style="display:none;" accept=".tim,.json,.csv" multiple>
+          </div>
+          <!-- Hidden -->
+          <div class="folder-card dataset-hidden" id="fcard-hidden">
+            <span class="folder-count" id="fcount-hidden">0 files</span>
+            <div class="folder-label">🔮 Hidden Dataset</div>
+            <div class="folder-desc">15,000 eval budget · comp-2007-2-17 to 2-24</div>
+            <div class="folder-file-list" id="flist-hidden"></div>
+            <button class="folder-add-btn" id="fadd-hidden" data-cat="hidden">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+              Add .tim files
+            </button>
+            <input type="file" id="finput-hidden" style="display:none;" accept=".tim,.json,.csv" multiple>
+          </div>
+        </div>
+
+        <!-- Parse All button -->
+        <button class="parse-btn" id="parse-all-btn" disabled style="max-width:340px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          Parse All Queued Datasets
+        </button>
+      </div>
+
+      <!-- ══ TAB SECTION ══════════════════════════════════════════ -->
+      <div class="card">
+
+        <!-- Tabs -->
+        <nav class="tabs-nav">
+          <button class="tab-btn active" data-tab="tab-overview">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            Overview
+          </button>
+          <button class="tab-btn" data-tab="tab-rooms">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            Rooms
+          </button>
+          <button class="tab-btn" data-tab="tab-courses">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+            Courses
+          </button>
+          <button class="tab-btn" data-tab="tab-curricula">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+            Curricula
+          </button>
+          <button class="tab-btn" data-tab="tab-constraints">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            Constraints
+          </button>
+          <button class="tab-btn" data-tab="tab-compare">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            Compare
+          </button>
+          <button class="tab-btn" data-tab="tab-raw">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+            Raw Format
+          </button>
+        </nav>
+
+        <!-- Empty state (shown until file parsed) -->
+        <div id="empty-state-wrap">
+          <div class="empty-state">
+            <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h2"/><path d="M8 17h6"/></svg>
+            <div class="empty-title">No Dataset Loaded</div>
+            <div class="empty-desc">Upload one or more UCTP dataset files using the panel on the left, then press <strong>Parse Selected Files</strong> to begin extraction.</div>
+          </div>
+        </div>
+
+        <!-- Tab contents (hidden until file loaded) -->
+        <div id="tab-section" style="display:none;">
+
+          <!-- TAB: OVERVIEW -->
+          <div class="tab-content active" id="tab-overview">
+            <div class="settings-big-grid" id="ov-settings"></div>
+            <div class="table-wrap">
+              <div class="table-scroll">
+                <table>
+                  <thead><tr>
+                    <th>Metric</th><th>Value</th><th>Details</th>
+                  </tr></thead>
+                  <tbody id="ov-table-body"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB: ROOMS -->
+          <div class="tab-content" id="tab-rooms">
+            <div class="table-wrap">
+              <div class="table-scroll">
+                <table>
+                  <thead><tr>
+                    <th>Room ID</th><th>Capacity</th><th>Utilisation Class</th>
+                  </tr></thead>
+                  <tbody id="rooms-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="row-count" id="rooms-count"></div>
+          </div>
+
+          <!-- TAB: COURSES -->
+          <div class="tab-content" id="tab-courses">
+            <div class="table-wrap mb-2">
+              <div class="table-scroll">
+                <table>
+                  <thead><tr>
+                    <th>Course ID</th><th>Teacher</th><th>Lectures</th><th>Students</th>
+                  </tr></thead>
+                  <tbody id="courses-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="row-count" id="courses-count"></div>
+          </div>
+
+          <!-- TAB: CURRICULA -->
+          <div class="tab-content" id="tab-curricula">
+            <div class="table-wrap">
+              <div class="table-scroll">
+                <table>
+                  <thead><tr>
+                    <th>Curriculum ID</th><th>Course Count</th><th>Associated Courses</th>
+                  </tr></thead>
+                  <tbody id="cur-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="row-count" id="cur-count"></div>
+          </div>
+
+          <!-- TAB: CONSTRAINTS -->
+          <div class="tab-content" id="tab-constraints">
+            <div class="table-wrap mb-2">
+              <div class="card-title mb-1" style="padding-left:0.5rem; padding-top:0.5rem;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;color:var(--rose)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                Period Constraints — Banned Timeslots
+              </div>
+              <div class="table-scroll">
+                <table>
+                  <thead><tr>
+                    <th>Course ID</th><th>Count</th><th>Banned Periods</th>
+                  </tr></thead>
+                  <tbody id="pc-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <div class="card-title mb-1" style="padding-left:0.5rem; padding-top:0.5rem;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;color:var(--cyan)"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg>
+                Room Constraints — Allowed Rooms
+              </div>
+              <div class="table-scroll">
+                <table>
+                  <thead><tr>
+                    <th>Course ID</th><th>Count</th><th>Allowed Rooms</th>
+                  </tr></thead>
+                  <tbody id="rc-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB: COMPARE -->
+          <div class="tab-content" id="tab-compare">
+            <p class="text-xs text-muted mb-2">All successfully parsed datasets loaded in this session. Click a card to inspect its details.</p>
+            <div class="compare-grid" id="compare-grid">
+              <!-- populated by JS -->
+            </div>
+          </div>
+
+          <!-- TAB: RAW FORMAT -->
+          <div class="tab-content" id="tab-raw">
+            <p class="text-xs text-muted mb-1">Parsed header block — token structure extracted from file:</p>
+            <div class="raw-block" id="raw-block">Upload and parse a file to see its header token structure here.</div>
+          </div>
+
+        </div><!-- /tab-section -->
+      </div><!-- /main card -->
+
+    </main>
+  </div><!-- /main-grid -->
+</div><!-- /page-wrap -->
+
+<script>
+  /* ═══════════════════════════════════════════════════════════════════
+     STATE
+  ═══════════════════════════════════════════════════════════════════ */
+  const state = {
+    activeCategory: 'early',
+    queue: [],              // {file, category, status:'pending'|'ok'|'error', data:null}
+    parsedInstances: [],    // {filename, category, data}
+    activeInstance: null,
+    folderFiles: { early: [], late: [], hidden: [] }
+  };
+
+  /* ═══════════════════════════════════════════════════════════════════
+     DOM REFS
+  ═══════════════════════════════════════════════════════════════════ */
+  const $ = id => document.getElementById(id);
+  const dropZone     = $('drop-zone');
+  const fileInput    = $('file-input');
+  const fileQueue    = $('file-queue');
+  const parseBtn     = $('parse-btn');
+  const parseAllBtn  = $('parse-all-btn');
+  const logPanel     = $('log-panel');
+  const progOuter    = $('prog-outer');
+  const progBar      = $('prog-bar');
+  const statsCard    = $('stats-card');
+  const statusDot    = $('status-dot');
+  const statusText   = $('status-text');
+  const emptyWrap    = $('empty-state-wrap');
+  const tabSection   = $('tab-section');
+
+  /* ═══════════════════════════════════════════════════════════════════
+     INIT
+  ═══════════════════════════════════════════════════════════════════ */
+  lucide.createIcons();
+
+  /* Tab switching */
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      $(btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  /* Category tabs */
+  document.querySelectorAll('.cat-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.cat-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.activeCategory = btn.dataset.cat;
+    });
+  });
+
+  /* Folder manager buttons */
+  ['early', 'late', 'hidden'].forEach(cat => {
+    $(`fadd-${cat}`).addEventListener('click', () => $(`finput-${cat}`).click());
+    $(`finput-${cat}`).addEventListener('change', e => handleFolderFiles(cat, e.target.files));
+  });
+
+  /* ═══════════════════════════════════════════════════════════════════
+     DRAG & DROP
+  ═══════════════════════════════════════════════════════════════════ */
+  dropZone.addEventListener('click', () => fileInput.click());
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault(); dropZone.classList.remove('dragover');
+    addFilesToQueue([...e.dataTransfer.files], state.activeCategory);
+  });
+  fileInput.addEventListener('change', () => {
+    addFilesToQueue([...fileInput.files], state.activeCategory);
+    fileInput.value = '';
+  });
+
+  /* ═══════════════════════════════════════════════════════════════════
+     FILE QUEUE MANAGEMENT
+  ═══════════════════════════════════════════════════════════════════ */
+  function isValidExt(name) {
+    return name.match(/\.(tim|json|csv)$/i);
+  }
+
+  function addFilesToQueue(files, category) {
+    files.forEach(f => {
+      if (!isValidExt(f.name)) { log(`Skipped "${f.name}" — unsupported format`, 'warn'); return; }
+      // avoid dupes
+      if (state.queue.find(q => q.file.name === f.name && q.category === category)) return;
+      state.queue.push({ file: f, category, status: 'pending', data: null });
+    });
+    renderQueue();
+    parseBtn.disabled = state.queue.filter(q=>q.status==='pending').length === 0;
+  }
+
+  function renderQueue() {
+    fileQueue.innerHTML = '';
+    state.queue.forEach((item, idx) => {
+      const el = document.createElement('div');
+      el.className = `file-item ${item.status === 'ok' ? 'active' : item.status === 'error' ? 'error' : ''}`;
+      el.innerHTML = `
+        <div class="file-item-icon ${item.status === 'ok' ? 'ok' : item.status === 'error' ? 'err' : 'pend'}">
+          ${item.status === 'ok'
+            ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`
+            : item.status === 'error'
+            ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`
+            : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`}
+        </div>
+        <div class="file-name" title="${item.file.name}">${item.file.name}</div>
+        <div class="file-size">${catBadge(item.category)} ${fmtSize(item.file.size)}</div>
+        <button class="file-btn" data-idx="${idx}" title="Remove">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>`;
+      fileQueue.appendChild(el);
+    });
+    fileQueue.querySelectorAll('.file-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.queue.splice(parseInt(btn.dataset.idx), 1);
+        renderQueue();
+        parseBtn.disabled = state.queue.filter(q=>q.status==='pending').length === 0;
+      });
+    });
+    lucide.createIcons();
+  }
+
+  function catBadge(cat) {
+    const map = { early:'🌱', late:'🌆', hidden:'🔮' };
+    return `<span style="opacity:0.7">${map[cat]||''}</span>`;
+  }
+
+  function fmtSize(bytes) {
+    if (bytes > 1024*1024) return (bytes/1024/1024).toFixed(1)+'MB';
+    return (bytes/1024).toFixed(0)+'KB';
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     FOLDER MANAGER
+  ═══════════════════════════════════════════════════════════════════ */
+  function handleFolderFiles(cat, files) {
+    [...files].forEach(f => {
+      if (!isValidExt(f.name)) { log(`Skipped "${f.name}"`, 'warn'); return; }
+      if (!state.folderFiles[cat].find(x => x.name === f.name)) {
+        state.folderFiles[cat].push(f);
+        addFilesToQueue([f], cat);
+      }
+    });
+    renderFolderLists();
+    updateParseAllBtn();
+  }
+
+  function renderFolderLists() {
+    ['early','late','hidden'].forEach(cat => {
+      const list = $(`flist-${cat}`);
+      list.innerHTML = '';
+      state.folderFiles[cat].forEach(f => {
+        const el = document.createElement('div');
+        el.className = 'folder-file-entry loaded';
+        el.innerHTML = `
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          ${f.name}`;
+        list.appendChild(el);
+      });
+      $(`fcount-${cat}`).textContent = `${state.folderFiles[cat].length} file${state.folderFiles[cat].length !== 1 ? 's' : ''}`;
+    });
+    lucide.createIcons();
+  }
+
+  function updateParseAllBtn() {
+    const total = Object.values(state.folderFiles).reduce((a,b)=>a+b.length,0);
+    parseAllBtn.disabled = total === 0;
+  }
+
+  parseAllBtn.addEventListener('click', () => {
+    // add all folder files to queue
+    ['early','late','hidden'].forEach(cat => {
+      state.folderFiles[cat].forEach(f => addFilesToQueue([f], cat));
+    });
+    parseBtn.click();
+  });
+
+  /* ═══════════════════════════════════════════════════════════════════
+     PARSE ACTION
+  ═══════════════════════════════════════════════════════════════════ */
+  parseBtn.addEventListener('click', async () => {
+    const pending = state.queue.filter(q => q.status === 'pending');
+    if (pending.length === 0) return;
+
+    parseBtn.disabled = true;
+    setStatus('parsing', 'Parsing...');
+    setPipeline(-1); // reset
+
+    progOuter.style.display = 'block';
+    setProgress(0);
+    log(`Starting parse of ${pending.length} file(s)...`, 'step');
+
+    for (let i = 0; i < pending.length; i++) {
+      const item = pending[i];
+      log(`[${i+1}/${pending.length}] Uploading → ${item.file.name}`, 'info');
+      animatePipeline(item.file.name);
+
+      try {
+        const data = await parseFile(item.file);
+        item.status = 'ok';
+        item.data = data;
+        state.parsedInstances.push({ filename: item.file.name, category: item.category, data });
+        log(`✓ Parsed: ${data.name} — ${data.num_events} events, ${data.rooms.length} rooms`, 'success');
+        if (i === pending.length - 1 || state.activeInstance === null) {
+          state.activeInstance = state.parsedInstances[state.parsedInstances.length - 1];
+          renderAll(state.activeInstance.data, state.activeInstance.filename, state.activeInstance.category);
+        }
+      } catch (e) {
+        item.status = 'error';
+        log(`✗ Error parsing ${item.file.name}: ${e.message}`, 'error');
+      }
+
+      setProgress(Math.round((i+1)/pending.length*100));
+      renderQueue();
+    }
+
+    finishPipeline();
+    setStatus('done', `${state.parsedInstances.length} instance(s) loaded`);
+    renderCompare();
+    log(`Pipeline complete. ${state.parsedInstances.length} instance(s) ready.`, 'success');
+    parseBtn.disabled = state.queue.filter(q=>q.status==='pending').length === 0;
+  });
+
+  async function parseFile(file) {
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch('/parse-details', { method: 'POST', body: fd });
+    const json = await res.json();
+    if (json.error) throw new Error(json.error);
+    return json;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     PIPELINE ANIMATION
+  ═══════════════════════════════════════════════════════════════════ */
+  const STAGE_LABELS = ['File Read','Header Parse','Matrix Extract','Entity Build','Constraint Map','Instance Ready'];
+  const STAGE_TOKENS = ['Reading binary stream...','Extracting header tokens...','Processing data matrices...','Building entity objects...','Mapping constraint sets...','ProblemInstance finalised ✓'];
+
+  function setPipeline(activeIdx) {
+    for (let i = 0; i < 6; i++) {
+      const el = $(`pstage-${i}`);
+      el.classList.remove('done','active');
+      $(`pp-${i}`).textContent = '—';
+      if (i < activeIdx) { el.classList.add('done'); $(`pp-${i}`).textContent = '✓'; }
+      else if (i === activeIdx) { el.classList.add('active'); }
+    }
+  }
+
+  let _pipeInterval = null;
+  function animatePipeline(filename) {
+    clearInterval(_pipeInterval);
+    $('pipeline-status-txt').textContent = `Parsing: ${filename}`;
+    let stage = 0;
+    setPipeline(0);
+    const delays = [120, 200, 350, 200, 180, 0];
+    function advance() {
+      if (stage > 5) { clearInterval(_pipeInterval); return; }
+      $(`pp-${stage}`).textContent = STAGE_TOKENS[stage];
+      log(`[pipeline] Stage ${stage+1}/6: ${STAGE_LABELS[stage]}`, 'step');
+      setPipeline(stage);
+      stage++;
+      if (stage <= 5) {
+        setTimeout(advance, delays[stage] || 150);
+      } else {
+        finishPipeline();
+      }
+    }
+    setTimeout(advance, 80);
+  }
+
+  function finishPipeline() {
+    for (let i = 0; i < 6; i++) {
+      $(`pstage-${i}`).classList.add('done');
+      $(`pstage-${i}`).classList.remove('active');
+      $(`pp-${i}`).textContent = '✓';
+    }
+    $('pipeline-status-txt').textContent = 'All stages complete ✓';
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     PROGRESS / STATUS
+  ═══════════════════════════════════════════════════════════════════ */
+  function setProgress(pct) { progBar.style.width = pct + '%'; }
+  function setStatus(type, msg) {
+    statusDot.className = 'status-dot ' + type;
+    statusText.textContent = msg;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     LOG
+  ═══════════════════════════════════════════════════════════════════ */
+  function log(msg, type = 'info') {
+    const line = document.createElement('div');
+    line.className = `log-line ${type}`;
+    const now = new Date();
+    const t = [now.getHours(), now.getMinutes(), now.getSeconds()].map(x => String(x).padStart(2,'0')).join(':');
+    line.innerHTML = `<span class="log-time">${t}</span><span class="log-msg">${msg}</span>`;
+    logPanel.appendChild(line);
+    logPanel.scrollTop = logPanel.scrollHeight;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     RENDER ALL TABS
+  ═══════════════════════════════════════════════════════════════════ */
+  function renderAll(data, filename, category) {
+    emptyWrap.style.display = 'none';
+    tabSection.style.display = 'block';
+
+    renderOverview(data, filename, category);
+    renderRooms(data);
+    renderCourses(data);
+    renderCurricula(data);
+    renderConstraints(data);
+    renderRaw(data);
+    renderStats(data, filename, category);
+  }
+
+  /* ─── Overview ─── */
+  function renderOverview(data, filename, category) {
+    // Big settings blocks
+    $('ov-settings').innerHTML = `
+      <div class="setting-block">
+        <div class="setting-val">${data.days}</div>
+        <div class="setting-lbl">Days</div>
+      </div>
+      <div class="setting-block">
+        <div class="setting-val">${data.periods_per_day}</div>
+        <div class="setting-lbl">Periods / Day</div>
+      </div>
+      <div class="setting-block">
+        <div class="setting-val">${data.days * data.periods_per_day}</div>
+        <div class="setting-lbl">Total Timeslots</div>
+      </div>`;
+
+    const catMap = { early:['🌱 Early Dataset','var(--emerald)'], late:['🌆 Late Dataset','var(--amber)'], hidden:['🔮 Hidden Dataset','var(--indigo)'] };
+    const [catLabel, catColor] = catMap[category] || ['Unknown','var(--text-muted)'];
+    const tbody = $('ov-table-body');
+    tbody.innerHTML = '';
+    const rows = [
+      ['Instance Name', data.name, `<span class="chip" style="background:var(--emerald-lo)">.tim</span>`],
+      ['Dataset Category', catLabel, `<span style="color:${catColor};font-size:0.75rem;">ITC-2007 Track 2</span>`],
+      ['File', filename, ''],
+      ['Total Events (Lectures)', data.num_events, `${data.num_events} scheduling slots required`],
+      ['Rooms Available', data.rooms.length, `${data.rooms.reduce ? '' : ''}—`],
+      ['Courses Registered', data.courses.length, `${data.courses.length} unique courses`],
+      ['Students Enrolled', data.students_count, `Across all courses`],
+      ['Curricula Groups', data.curricula.length, `Conflict cluster definitions`],
+      ['Period Constraints', data.period_constraints.length, `Hard banned-timeslot constraints`],
+      ['Room Constraints', data.room_constraints.length, `Hard room-restriction constraints`],
+    ];
+    rows.forEach(([metric, value, detail]) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td style="color:var(--text-secondary);font-size:0.8rem;">${metric}</td>
+        <td class="td-id">${value}</td>
+        <td style="color:var(--text-muted);font-size:0.75rem;">${detail}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  /* ─── Rooms ─── */
+  function renderRooms(data) {
+    const tbody = $('rooms-tbody');
+    tbody.innerHTML = '';
+    const max = Math.max(...data.rooms.map(r=>r.capacity));
+    data.rooms.forEach(r => {
+      const pct = (r.capacity / max * 100).toFixed(0);
+      const cls = r.capacity >= max*0.7 ? 'Large' : r.capacity >= max*0.4 ? 'Medium' : 'Small';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="td-id">${r.id}</td>
+        <td><span class="chip">${r.capacity} seats</span></td>
+        <td>
+          <div style="display:flex;align-items:center;gap:0.6rem;">
+            <div style="flex:1;height:4px;background:rgba(0,0,0,0.3);border-radius:999px;">
+              <div style="width:${pct}%;height:100%;background:var(--emerald);border-radius:999px;"></div>
+            </div>
+            <span style="font-size:0.7rem;color:var(--text-muted);min-width:48px;">${cls} (${pct}%)</span>
+          </div>
+        </td>`;
+      tbody.appendChild(tr);
+    });
+    $('rooms-count').textContent = `${data.rooms.length} rooms parsed`;
+  }
+
+  /* ─── Courses ─── */
+  function renderCourses(data) {
+    const tbody = $('courses-tbody');
+    tbody.innerHTML = '';
+    data.courses.forEach(c => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="td-id">${c.id}</td>
+        <td style="color:var(--text-secondary)">${c.teacher}</td>
+        <td><span class="chip">${c.lectures}</span></td>
+        <td><span class="chip">${c.students}</span></td>`;
+      tbody.appendChild(tr);
+    });
+    $('courses-count').textContent = `${data.courses.length} courses parsed`;
+  }
+
+  /* ─── Curricula ─── */
+  function renderCurricula(data) {
+    const tbody = $('cur-tbody');
+    tbody.innerHTML = '';
+    if (data.curricula.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:2rem;">No curricula definitions in this instance.</td></tr>`;
+    } else {
+      data.curricula.forEach(cur => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="td-id">${cur.id}</td>
+          <td><span class="chip">${cur.courses.length}</span></td>
+          <td><div class="chips-wrap">${cur.courses.map(x=>`<span class="chip cur">${x}</span>`).join('')}</div></td>`;
+        tbody.appendChild(tr);
+      });
+    }
+    $('cur-count').textContent = `${data.curricula.length} curricula parsed`;
+  }
+
+  /* ─── Constraints ─── */
+  function renderConstraints(data) {
+    const pcTbody = $('pc-tbody');
+    pcTbody.innerHTML = '';
+    if (data.period_constraints.length === 0) {
+      pcTbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:1.5rem;">No period constraints in this instance.</td></tr>`;
+    } else {
+      data.period_constraints.forEach(pc => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="td-id">${pc.course_id}</td>
+          <td><span class="chip banned">${pc.banned_periods.length} banned</span></td>
+          <td><div class="chips-wrap">${pc.banned_periods.slice(0,20).map(x=>`<span class="chip banned">Slot ${x}</span>`).join('')}${pc.banned_periods.length>20?`<span style="color:var(--text-muted);font-size:0.7rem;">+${pc.banned_periods.length-20} more</span>`:''}</div></td>`;
+        pcTbody.appendChild(tr);
+      });
+    }
+
+    const rcTbody = $('rc-tbody');
+    rcTbody.innerHTML = '';
+    if (data.room_constraints.length === 0) {
+      rcTbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:1.5rem;">No room constraints in this instance.</td></tr>`;
+    } else {
+      data.room_constraints.forEach(rc => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="td-id">${rc.course_id}</td>
+          <td><span class="chip room">${rc.allowed_rooms.length} rooms</span></td>
+          <td><div class="chips-wrap">${rc.allowed_rooms.map(x=>`<span class="chip room">${x}</span>`).join('')}</div></td>`;
+        rcTbody.appendChild(tr);
+      });
+    }
+  }
+
+  /* ─── Stats card ─── */
+  function renderStats(data, filename, category) {
+    statsCard.style.display = 'block';
+    $('stats-card-title').textContent = data.name;
+    $('stats-grid').innerHTML = `
+      <div class="stat-cell"><div class="stat-label">Events</div><div class="stat-value">${data.num_events}</div></div>
+      <div class="stat-cell"><div class="stat-label">Rooms</div><div class="stat-value">${data.rooms.length}</div></div>
+      <div class="stat-cell"><div class="stat-label">Courses</div><div class="stat-value">${data.courses.length}</div></div>
+      <div class="stat-cell"><div class="stat-label">Students</div><div class="stat-value">${data.students_count.toLocaleString()}</div></div>
+      <div class="stat-cell"><div class="stat-label">Curricula</div><div class="stat-value">${data.curricula.length}</div></div>
+      <div class="stat-cell"><div class="stat-label">Timeslots</div><div class="stat-value">${data.days*data.periods_per_day}</div></div>`;
+  }
+
+  /* ─── Raw format ─── */
+  function renderRaw(data) {
+    const block = $('raw-block');
+    const lines = [
+      `<span class="raw-comment"># ITC-2007 Track 2 — Parsed Header Tokens</span>`,
+      `<span class="raw-comment"># Instance: ${data.name}</span>`,
+      ``,
+      `<span class="raw-kw">num_events</span>      = <span class="raw-num">${data.num_events}</span>`,
+      `<span class="raw-kw">num_rooms</span>       = <span class="raw-num">${data.rooms.length}</span>`,
+      `<span class="raw-kw">num_students</span>    = <span class="raw-num">${data.students_count}</span>`,
+      `<span class="raw-kw">num_curricula</span>   = <span class="raw-num">${data.curricula.length}</span>`,
+      `<span class="raw-kw">days</span>            = <span class="raw-num">${data.days}</span>`,
+      `<span class="raw-kw">periods_per_day</span> = <span class="raw-num">${data.periods_per_day}</span>`,
+      `<span class="raw-kw">total_timeslots</span> = <span class="raw-num">${data.days * data.periods_per_day}</span>`,
+      ``,
+      `<span class="raw-comment"># Constraint Summary</span>`,
+      `<span class="raw-kw">period_constraints</span>: <span class="raw-num">${data.period_constraints.length}</span> course(s) with banned slots`,
+      `<span class="raw-kw">room_constraints</span>:   <span class="raw-num">${data.room_constraints.length}</span> course(s) with room restrictions`,
+      ``,
+      `<span class="raw-comment"># Room Capacities (first 10)</span>`,
+      ...data.rooms.slice(0,10).map(r=>`  <span class="raw-str">${r.id}</span>: <span class="raw-num">${r.capacity}</span>`),
+      data.rooms.length > 10 ? `  <span class="raw-comment">... and ${data.rooms.length-10} more rooms</span>` : '',
+      ``,
+      `<span class="raw-comment"># Courses (first 5)</span>`,
+      ...data.courses.slice(0,5).map(c=>`  <span class="raw-str">${c.id}</span> (<span class="raw-kw">${c.teacher}</span>): <span class="raw-num">${c.lectures}</span> lec × <span class="raw-num">${c.students}</span> students`),
+      data.courses.length > 5 ? `  <span class="raw-comment">... and ${data.courses.length-5} more courses</span>` : '',
+    ];
+    block.innerHTML = lines.join('\n');
+  }
+
+  /* ─── Compare tab ─── */
+  function renderCompare() {
+    const grid = $('compare-grid');
+    grid.innerHTML = '';
+    if (state.parsedInstances.length === 0) {
+      grid.innerHTML = `<p class="text-xs text-muted">No instances parsed yet.</p>`;
+      return;
+    }
+    state.parsedInstances.forEach((inst, idx) => {
+      const d = inst.data;
+      const catMap = {early:'early',late:'late',hidden:'dataset-hidden'};
+      const card = document.createElement('div');
+      card.className = `compare-card${state.activeInstance && state.activeInstance.filename === inst.filename ? ' active' : ''}`;
+      card.innerHTML = `
+        <span class="category-tag ${catMap[inst.category]||''}">${inst.category?.toUpperCase() || 'CUSTOM'}</span>
+        <div class="compare-card-name">${d.name}</div>
+        <div class="compare-meta">${inst.filename} · ${d.days}d × ${d.periods_per_day}p</div>
+        <div class="compare-stats">
+          <div class="cmp-stat"><div class="cmp-stat-val">${d.num_events}</div><div class="cmp-stat-lbl">Events</div></div>
+          <div class="cmp-stat"><div class="cmp-stat-val">${d.rooms.length}</div><div class="cmp-stat-lbl">Rooms</div></div>
+          <div class="cmp-stat"><div class="cmp-stat-val">${d.courses.length}</div><div class="cmp-stat-lbl">Courses</div></div>
+          <div class="cmp-stat"><div class="cmp-stat-val">${d.students_count.toLocaleString()}</div><div class="cmp-stat-lbl">Students</div></div>
+        </div>`;
+      card.addEventListener('click', () => {
+        state.activeInstance = inst;
+        renderAll(inst.data, inst.filename, inst.category);
+        renderCompare();
+        // Switch to Overview tab
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        document.querySelector('[data-tab="tab-overview"]').classList.add('active');
+        $('tab-overview').classList.add('active');
+        log(`Switched active instance → ${d.name}`, 'info');
+      });
+      grid.appendChild(card);
+    });
+  }
+</script>
+</body>
+</html>

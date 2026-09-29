@@ -1,0 +1,10 @@
+Settings, 2, 4
+Room, RoomX, 40
+Room, RoomY, 80
+Course, Biology, DrGreen, 2, 35
+Course, Physics, DrWhite, 2, 50
+Student, StudentA, Biology;Physics
+Student, StudentB, Physics
+Curriculum, SciCur, Biology;Physics
+PeriodConstraint, Biology, 1
+RoomConstraint, Physics, RoomY

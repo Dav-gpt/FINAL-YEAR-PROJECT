@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UCTP Solver: Interactive Swarm Optimization Dashboard</title>
+  <!-- Google Fonts: Outfit (headings) & Inter (body) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Marked.js for markdown parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    /* RESET & CORE VARIABLES */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    :root {
+      --bg-darker: #070913;
+      --bg-dark: #0f1225;
+      --bg-panel: rgba(20, 24, 48, 0.6);
+      --border-panel: rgba(255, 255, 255, 0.08);
+      --accent-primary: #6366f1; /* Indigo */
+      --accent-primary-glow: rgba(99, 102, 241, 0.4);
+      --accent-secondary: #06b6d4; /* Cyan */
+      --accent-secondary-glow: rgba(6, 182, 212, 0.4);
+      --accent-success: #10b981; /* Emerald */
+      --accent-success-glow: rgba(16, 185, 129, 0.3);
+      --accent-warning: #f59e0b; /* Amber */
+      --accent-error: #ef4444; /* Rose */
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --font-outfit: 'Outfit', sans-serif;
+      --font-inter: 'Inter', sans-serif;
+      --shadow-soft: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+      --transition-fast: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      --transition-normal: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    body {
+      font-family: var(--font-inter);
+      background-color: var(--bg-darker);
+      color: var(--text-main);
+      min-height: 100vh;
+      line-height: 1.6;
+      background-image: 
+        radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(6, 182, 212, 0.08) 0%, transparent 40%);
+      background-attachment: fixed;
+      overflow-x: hidden;
+    }
+
+    h1, h2, h3, h4 {
+      font-family: var(--font-outfit);
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    /* SCROLLBAR */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--bg-darker);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    /* LAYOUT */
+    .dashboard-container {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    /* HEADER */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border-panel);
+    }
+    .header-title-area h1 {
+      font-size: 2.2rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #ffffff 30%, #a5b4fc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .header-title-area p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      margin-top: 0.2rem;
+    }
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(99, 102, 241, 0.1);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      padding: 0.5rem 1rem;
+      border-radius: 50px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #a5b4fc;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      background-color: var(--accent-primary);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--accent-primary);
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(0.9); opacity: 0.6; }
+      50% { transform: scale(1.2); opacity: 1; }
+      100% { transform: scale(0.9); opacity: 0.6; }
+    }
+
+    /* MAIN CONTAINER */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 350px 1fr;
+      gap: 2rem;
+      align-items: start;
+    }
+
+    /* GLASS PANEL */
+    .glass-panel {
+      background: var(--bg-panel);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border-panel);
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: var(--shadow-soft);
+      margin-bottom: 1.5rem;
+    }
+    .panel-title {
+      font-size: 1.2rem;
+      margin-bottom: 1.2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: #ffffff;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding-bottom: 0.5rem;
+    }
+    .panel-title i {
+      color: var(--accent-secondary);
+    }
+
+    /* UPLOAD AREA */
+    .upload-zone {
+      border: 2px dashed rgba(255, 255, 255, 0.15);
+      border-radius: 12px;
+      padding: 2rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: var(--transition-normal);
+      position: relative;
+    }
+    .upload-zone:hover {
+      border-color: var(--accent-secondary);
+      background: rgba(6, 182, 212, 0.03);
+    }
+    .upload-zone.dragover {
+      border-color: var(--accent-primary);
+      background: rgba(99, 102, 241, 0.05);
+    }
+    .upload-icon {
+      font-size: 2.5rem;
+      color: var(--text-muted);
+      margin-bottom: 1rem;
+    }
+    .upload-zone p {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+    .upload-zone b {
+      color: #ffffff;
+    }
+    .file-input {
+      display: none;
+    }
+
+    /* DATASET STATS */
+    .dataset-stats {
+      margin-top: 1rem;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.8rem;
+    }
+    .stat-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      padding: 0.8rem;
+      text-align: center;
+    }
+    .stat-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .stat-value {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin-top: 0.2rem;
+    }
+
+    /* CONFIGURATION */
+    .form-group {
+      margin-bottom: 1.2rem;
+    }
+    .form-label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+    }
+    .checkbox-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      background: rgba(255, 255, 255, 0.02);
+      padding: 0.8rem;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-size: 0.9rem;
+      color: var(--text-main);
+      cursor: pointer;
+    }
+    .checkbox-label input {
+      accent-color: var(--accent-secondary);
+      width: 16px;
+      height: 16px;
+    }
+    .profile-select {
+      width: 100%;
+      background: #151833;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #ffffff;
+      padding: 0.6rem;
+      border-radius: 8px;
+      outline: none;
+      font-family: var(--font-inter);
+      font-size: 0.9rem;
+    }
+    .num-input {
+      width: 100%;
+      background: #151833;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #ffffff;
+      padding: 0.6rem;
+      border-radius: 8px;
+      outline: none;
+      font-family: var(--font-inter);
+      font-size: 0.9rem;
+    }
+
+    /* BUTTONS */
+    .btn-primary {
+      width: 100%;
+      background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+      color: #ffffff;
+      border: none;
+      padding: 0.8rem 1.5rem;
+      border-radius: 8px;
+      font-family: var(--font-outfit);
+      font-weight: 700;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: var(--transition-normal);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
+    }
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+    .btn-primary:disabled {
+      background: #374151;
+      box-shadow: none;
+      cursor: not-allowed;
+      color: var(--text-muted);
+    }
+
+    /* RIGHT COLUMN: TABS */
+    .tabs-header {
+      display: flex;
+      gap: 0.5rem;
+      background: rgba(15, 18, 37, 0.8);
+      padding: 0.3rem;
+      border-radius: 10px;
+      border: 1px solid var(--border-panel);
+      margin-bottom: 1.5rem;
+    }
+    .tab-btn {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 0.6rem 1rem;
+      font-family: var(--font-outfit);
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      border-radius: 8px;
+      transition: var(--transition-fast);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+    .tab-btn:hover {
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .tab-btn.active {
+      color: #ffffff;
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.3) 0%, rgba(6, 182, 212, 0.3) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: var(--shadow-soft);
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+
+    /* SUMMARY TABLE */
+    .table-container {
+      overflow-x: auto;
+      margin-bottom: 1.5rem;
+      border-radius: 8px;
+      border: 1px solid var(--border-panel);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.9rem;
+      background: rgba(15, 18, 37, 0.4);
+    }
+    th {
+      background: rgba(99, 102, 241, 0.1);
+      color: #ffffff;
+      font-weight: 600;
+      padding: 0.8rem 1rem;
+      border-bottom: 1px solid var(--border-panel);
+    }
+    td {
+      padding: 0.8rem 1rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+    }
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    /* ACADEMIC DISCUSSION WRAPPER */
+    .discussion-text {
+      background: rgba(10, 12, 28, 0.6);
+      border-radius: 12px;
+      padding: 1.5rem;
+      border-left: 4px solid var(--accent-primary);
+      margin-top: 1.5rem;
+      font-size: 0.95rem;
+    }
+    .discussion-text h3 {
+      font-size: 1.2rem;
+      margin-bottom: 1rem;
+      color: #ffffff;
+      font-family: var(--font-outfit);
+    }
+    .discussion-text h4 {
+      font-size: 1rem;
+      margin: 1.2rem 0 0.6rem 0;
+      color: #a5b4fc;
+    }
+    .discussion-text p {
+      margin-bottom: 0.8rem;
+      color: var(--text-main);
+    }
+    .discussion-text ul, .discussion-text ol {
+      margin-left: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    .discussion-text li {
+      margin-bottom: 0.4rem;
+    }
+
+    /* CHARTS CONTAINER */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.5rem;
+    }
+    .chart-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-panel);
+      border-radius: 12px;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .chart-card h4 {
+      font-size: 0.95rem;
+      margin-bottom: 0.8rem;
+      color: #ffffff;
+      align-self: flex-start;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding-bottom: 0.3rem;
+      width: 100%;
+    }
+    .chart-img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+      background: #ffffff;
+      padding: 5px;
+    }
+
+    /* TIMETABLE GRID */
+    .timetable-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.2rem;
+    }
+    .grid-scroller {
+      overflow-x: auto;
+      border: 1px solid var(--border-panel);
+      border-radius: 8px;
+      background: rgba(15, 18, 37, 0.4);
+    }
+    .timetable-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+    .timetable-table th, .timetable-table td {
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      padding: 0.5rem;
+      text-align: center;
+      min-width: 90px;
+    }
+    .timetable-table th {
+      background: rgba(99, 102, 241, 0.15);
+      color: #ffffff;
+    }
+    .period-header {
+      background: rgba(15, 18, 37, 0.8) !important;
+      font-weight: bold;
+    }
+    .schedule-cell {
+      height: 45px;
+      vertical-align: middle;
+      font-weight: 500;
+      border-radius: 4px;
+      transition: var(--transition-fast);
+    }
+    .schedule-cell.occupied {
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.25) 0%, rgba(6, 182, 212, 0.25) 100%);
+      border: 1px solid rgba(6, 182, 212, 0.4);
+      color: #e0f2fe;
+      cursor: help;
+    }
+    .schedule-cell.occupied:hover {
+      transform: scale(1.03);
+      box-shadow: 0 0 10px rgba(6, 182, 212, 0.3);
+    }
+    .schedule-cell.empty {
+      color: rgba(255, 255, 255, 0.1);
+    }
+
+    /* LOADING SPINNER */
+    .loader-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(7, 9, 19, 0.85);
+      z-index: 1000;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(8px);
+    }
+    .spinner {
+      width: 60px;
+      height: 60px;
+      border: 5px solid rgba(6, 182, 212, 0.1);
+      border-top-color: var(--accent-secondary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      100% { transform: rotate(360deg); }
+    }
+    .loader-overlay p {
+      margin-top: 1.5rem;
+      font-family: var(--font-outfit);
+      font-weight: 600;
+      color: #ffffff;
+      font-size: 1.1rem;
+      letter-spacing: 0.05em;
+    }
+
+    /* UTILS */
+    .text-center { text-align: center; }
+    .muted-text { color: var(--text-muted); }
+    .mt-4 { margin-top: 1.5rem; }
+    .bold-white { color: #ffffff; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+  <!-- LOADER -->
+  <div class="loader-overlay" id="loader">
+    <div class="spinner"></div>
+    <p>RUNNING COMPARATIVE OPTIMIZATION...</p>
+    <span class="muted-text" style="font-size: 0.85rem; margin-top: 0.5rem;">This may take a moment depending on the budget and runs</span>
+  </div>
+
+  <div class="dashboard-container">
+    
+    <!-- HEADER -->
+    <header class="header">
+      <div class="header-title-area">
+        <h1>UCTP Swarm & Local Optimization Framework</h1>
+        <p>Interactive Comparative Analysis for University Course Timetabling Metaheuristics</p>
+      </div>
+      <div class="status-badge">
+        <div class="status-dot" id="status-dot"></div>
+        <span id="status-text">Framework Ready</span>
+      </div>
+    </header>
+
+    <div class="main-grid">
+      
+      <!-- LEFT COLUMN: CONTROLS -->
+      <aside class="left-col">
+        
+        <!-- DATASET PANEL -->
+        <div class="glass-panel">
+          <h3 class="panel-title"><i data-lucide="file-up"></i> Upload Dataset</h3>
+          
+          <div class="upload-zone" id="upload-zone">
+            <i class="upload-icon" data-lucide="cloud-lightning"></i>
+            <p>Drag & drop dataset file or click to browse</p>
+            <span class="muted-text" style="font-size: 0.75rem;">Supports <b>.tim</b>, <b>.csv</b>, or <b>.json</b> formats</span>
+            <input type="file" id="file-input" class="file-input" accept=".tim,.csv,.json">
+          </div>
+
+          <div id="file-details" style="display: none; margin-top: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
+              <span class="bold-white" id="loaded-filename" style="font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px;">file.tim</span>
+              <span class="status-badge" style="background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.3); color: #6ee7b7; padding: 0.2rem 0.6rem; font-size: 0.75rem;">Loaded</span>
+            </div>
+            
+            <div class="dataset-stats">
+              <div class="stat-card">
+                <div class="stat-label">Events</div>
+                <div class="stat-value" id="stat-events">-</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Rooms</div>
+                <div class="stat-value" id="stat-rooms">-</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Courses</div>
+                <div class="stat-value" id="stat-courses">-</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Students</div>
+                <div class="stat-value" id="stat-students">-</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SOLVERS CONFIG PANEL -->
+        <div class="glass-panel">
+          <h3 class="panel-title"><i data-lucide="cpu"></i> Algorithm Config</h3>
+          
+          <div class="form-group">
+            <label class="form-label">Select Algorithms</label>
+            <div class="checkbox-group">
+              <label class="checkbox-label">
+                <input type="checkbox" name="solvers" value="Enhanced_ARO" checked>
+                Enhanced ARO (Proposed)
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" name="solvers" value="Standard_ARO" checked>
+                Standard ARO (Li et al. 2023)
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" name="solvers" value="SA" checked>
+                Simulated Annealing
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Analysis Profile</label>
+            <select class="profile-select" id="analysis-profile">
+              <option value="quick" selected>Quick Profile (3 runs × 5,000 evals)</option>
+              <option value="standard">Standard Profile (5 runs × 10,000 evals)</option>
+              <option value="thesis">Thesis Profile (10 runs × 15,000 evals)</option>
+              <option value="custom">Custom Configuration...</option>
+            </select>
+          </div>
+
+          <div id="custom-params" style="display: none;">
+            <div class="form-group">
+              <label class="form-label">Independent Runs Count</label>
+              <input type="number" class="num-input" id="param-runs" value="3" min="1" max="30">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Evaluations Budget</label>
+              <input type="number" class="num-input" id="param-budget" value="5000" min="5000" max="15000">
+            </div>
+          </div>
+
+          <button class="btn-primary" id="run-btn" disabled>
+            <i data-lucide="play"></i> RUN COMPARATIVE ANALYSIS
+          </button>
+        </div>
+
+      </aside>
+
+      <!-- RIGHT COLUMN: RESULTS / VISUALIZATIONS -->
+      <main class="right-col">
+        
+        <!-- TABS HEADER -->
+        <nav class="tabs-header">
+          <button class="tab-btn active" data-tab="tab-dashboard"><i data-lucide="activity"></i> Metrics & Discussion</button>
+          <button class="tab-btn" data-tab="tab-charts"><i data-lucide="bar-chart-3"></i> Comparison Plots</button>
+          <button class="tab-btn" data-tab="tab-timetable"><i data-lucide="calendar"></i> Resulting Timetable</button>
+        </nav>
+
+        <!-- TAB CONTENT: DASHBOARD -->
+        <section class="tab-content active" id="tab-dashboard">
+          
+          <div class="glass-panel" id="no-results-panel">
+            <div class="text-center" style="padding: 3rem 1rem;">
+              <i data-lucide="bar-chart-3" style="width: 48px; height: 48px; color: var(--text-muted); margin-bottom: 1rem;"></i>
+              <h3>No Analysis Results Yet</h3>
+              <p class="muted-text mt-4" style="max-width: 500px; margin-left: auto; margin-right: auto;">
+                Please upload a UCTP dataset (<b>.tim</b> file) and click <b>Run Comparative Analysis</b> to execute the metaheuristics and generate comparative tables, academic discussions, and charts.
+              </p>
+            </div>
+          </div>
+
+          <div id="results-panel" style="display: none;">
+            <div class="glass-panel" style="padding-bottom: 0.5rem;">
+              <h3 class="panel-title"><i data-lucide="table"></i> Summary Statistics</h3>
+              <div class="table-container">
+                <table id="results-table">
+                  <thead>
+                    <tr>
+                      <th>Algorithm</th>
+                      <th>Best Fitness</th>
+                      <th>Mean Fitness</th>
+                      <th>Std. Deviation</th>
+                      <th>Avg. Hard Violations</th>
+                      <th>Avg. Soft Penalty</th>
+                      <th>Feasibility Rate</th>
+                      <th>Avg. Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <!-- Populated dynamically -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="discussion-text" id="explanation-content">
+              <!-- Populated dynamically as parsed markdown -->
+            </div>
+          </div>
+
+        </section>
+
+        <!-- TAB CONTENT: CHARTS -->
+        <section class="tab-content" id="tab-charts">
+          <div class="glass-panel" id="no-charts-panel">
+            <div class="text-center" style="padding: 3rem 1rem;">
+              <i data-lucide="image" style="width: 48px; height: 48px; color: var(--text-muted); margin-bottom: 1rem;"></i>
+              <h3>No Comparison Plots Generated</h3>
+              <p class="muted-text mt-4">Generate analysis results to view box plots, execution runtimes, convergence curves, and trade-off charts.</p>
+            </div>
+          </div>
+
+          <div id="charts-panel" style="display: none;">
+            <div class="charts-grid">
+              
+              <div class="chart-card">
+                <h4>1. Fitness Distribution Box Plot</h4>
+                <img id="chart-boxplot" src="" alt="Fitness Box Plot" class="chart-img">
+              </div>
+              
+              <div class="chart-card">
+                <h4>2. Convergence Curve (Log Scale)</h4>
+                <img id="chart-convergence" src="" alt="Convergence Curve" class="chart-img">
+              </div>
+              
+              <div class="chart-card">
+                <h4>3. Average Execution Time per Run</h4>
+                <img id="chart-runtime" src="" alt="Runtime Bar Chart" class="chart-img">
+              </div>
+              
+              <div class="chart-card">
+                <h4>4. Solution Quality vs. Time Trade-off</h4>
+                <img id="chart-tradeoff" src="" alt="Trade-off Scatter" class="chart-img">
+              </div>
+
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB CONTENT: TIMETABLE -->
+        <section class="tab-content" id="tab-timetable">
+          <div class="glass-panel" id="no-timetable-panel">
+            <div class="text-center" style="padding: 3rem 1rem;">
+              <i data-lucide="calendar" style="width: 48px; height: 48px; color: var(--text-muted); margin-bottom: 1rem;"></i>
+              <h3>No Schedule Found</h3>
+              <p class="muted-text mt-4">Run the comparative optimization framework to view the generated timetable assignments by room.</p>
+            </div>
+          </div>
+
+          <div id="timetable-panel" style="display: none;" class="glass-panel">
+            <div class="timetable-controls">
+              <div>
+                <h3 class="bold-white" style="display: inline-block; margin-right: 1rem;">Resulting Timetable</h3>
+                <span class="muted-text" id="schedule-meta">Best overall: Enhanced ARO</span>
+              </div>
+              <div style="display: flex; gap: 1rem; align-items: center;">
+                <div>
+                  <label class="form-label" style="display: inline-block; margin-right: 0.5rem; margin-bottom: 0;">Algorithm:</label>
+                  <select class="profile-select" id="timetable-solver-select" style="display: inline-block; width: 160px; padding: 0.4rem;">
+                    <!-- Populated dynamically -->
+                  </select>
+                </div>
+                <div>
+                  <label class="form-label" style="display: inline-block; margin-right: 0.5rem; margin-bottom: 0;">Room:</label>
+                  <select class="profile-select" id="room-select" style="display: inline-block; width: 100px; padding: 0.4rem;">
+                    <!-- Populated dynamically -->
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid-scroller">
+              <table class="timetable-table" id="timetable-grid-table">
+                <thead>
+                  <tr>
+                    <th>Day</th>
+                    <th>Period 1</th>
+                    <th>Period 2</th>
+                    <th>Period 3</th>
+                    <th>Period 4</th>
+                    <th>Period 5</th>
+                    <th>Period 6</th>
+                    <th>Period 7</th>
+                    <th>Period 8</th>
+                    <th>Period 9</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Populated dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+      </main>
+
+    </div>
+
+  </div>
+
+  <script>
+    // Global State
+    let currentFile = null;
+    let analysisResults = null;
+    let selectedRoom = "";
+
+    // DOM Elements
+    const uploadZone = document.getElementById('upload-zone');
+    const fileInput = document.getElementById('file-input');
+    const fileDetails = document.getElementById('file-details');
+    const loadedFilename = document.getElementById('loaded-filename');
+    const statEvents = document.getElementById('stat-events');
+    const statRooms = document.getElementById('stat-rooms');
+    const statCourses = document.getElementById('stat-courses');
+    const statStudents = document.getElementById('stat-students');
+    const runBtn = document.getElementById('run-btn');
+    const profileSelect = document.getElementById('analysis-profile');
+    const customParams = document.getElementById('custom-params');
+    const paramRuns = document.getElementById('param-runs');
+    const paramBudget = document.getElementById('param-budget');
+    const loader = document.getElementById('loader');
+
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    const noResultsPanel = document.getElementById('no-results-panel');
+    const resultsPanel = document.getElementById('results-panel');
+    const resultsTableBody = document.querySelector('#results-table tbody');
+    const explanationContent = document.getElementById('explanation-content');
+
+    const noChartsPanel = document.getElementById('no-charts-panel');
+    const chartsPanel = document.getElementById('charts-panel');
+
+    const noTimetablePanel = document.getElementById('no-timetable-panel');
+    const timetablePanel = document.getElementById('timetable-panel');
+    const timetableSolverSelect = document.getElementById('timetable-solver-select');
+    const roomSelect = document.getElementById('room-select');
+    const scheduleMeta = document.getElementById('schedule-meta');
+
+    // Initialize Lucide Icons
+    lucide.createIcons();
+
+    // Tab Navigation
+    tabButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        tabButtons.forEach(b => b.classList.remove('active'));
+        tabContents.forEach(c => c.classList.remove('active'));
+
+        btn.classList.add('active');
+        document.getElementById(btn.getAttribute('data-tab')).classList.add('active');
+      });
+    });
+
+    // Profile Selector Custom Handling
+    profileSelect.addEventListener('change', () => {
+      if (profileSelect.value === 'custom') {
+        customParams.style.display = 'block';
+      } else {
+        customParams.style.display = 'none';
+      }
+    });
+
+    // Drag and Drop Upload Handlers
+    uploadZone.addEventListener('click', () => fileInput.click());
+    
+    uploadZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      uploadZone.classList.add('dragover');
+    });
+
+    uploadZone.addEventListener('dragleave', () => {
+      uploadZone.classList.remove('dragover');
+    });
+
+    uploadZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadZone.classList.remove('dragover');
+      if (e.dataTransfer.files.length > 0) {
+        handleFileSelect(e.dataTransfer.files[0]);
+      }
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      if (fileInput.files.length > 0) {
+        handleFileSelect(fileInput.files[0]);
+      }
+    });
+
+    function handleFileSelect(file) {
+      const nameLower = file.name.toLowerCase();
+      if (!nameLower.endsWith('.tim') && !nameLower.endsWith('.csv') && !nameLower.endsWith('.json')) {
+        alert("Please upload a file with .tim, .csv, or .json extension.");
+        return;
+      }
+
+      document.getElementById('status-text').innerText = "Uploading File...";
+      document.getElementById('status-dot').style.backgroundColor = "var(--accent-warning)";
+      document.getElementById('status-dot').style.boxShadow = "0 0 8px var(--accent-warning)";
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      fetch('/upload', {
+        method: 'POST',
+        body: formData
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        currentFile = data;
+        loadedFilename.innerText = data.filename;
+        statEvents.innerText = data.events_count;
+        statRooms.innerText = data.rooms_count;
+        statCourses.innerText = data.courses_count;
+        statStudents.innerText = data.students_count;
+
+        fileDetails.style.display = 'block';
+        runBtn.removeAttribute('disabled');
+
+        document.getElementById('status-text').innerText = "Dataset Loaded";
+        document.getElementById('status-dot').style.backgroundColor = "var(--accent-success)";
+        document.getElementById('status-dot').style.boxShadow = "0 0 8px var(--accent-success)";
+      })
+      .catch(err => {
+        alert("Upload Error: " + err.message);
+        document.getElementById('status-text').innerText = "Upload Failed";
+        document.getElementById('status-dot').style.backgroundColor = "var(--accent-error)";
+        document.getElementById('status-dot').style.boxShadow = "0 0 8px var(--accent-error)";
+      });
+    }
+
+    // Run Analysis Execution
+    runBtn.addEventListener('click', () => {
+      if (!currentFile) return;
+
+      loader.style.display = 'flex';
+      document.getElementById('status-text').innerText = "Optimizing Timetable...";
+      document.getElementById('status-dot').style.backgroundColor = "var(--accent-primary)";
+      document.getElementById('status-dot').style.boxShadow = "0 0 8px var(--accent-primary)";
+
+      // Get configuration options
+      const solvers = Array.from(document.querySelectorAll('input[name="solvers"]:checked')).map(el => el.value);
+      
+      let runs = 3;
+      let budget = 5000;
+      
+      const profile = profileSelect.value;
+      if (profile === 'quick') {
+        runs = 3; budget = 5000;
+      } else if (profile === 'standard') {
+        runs = 5; budget = 10000;
+      } else if (profile === 'thesis') {
+        runs = 10; budget = 15000;
+      } else {
+        runs = parseInt(paramRuns.value) || 3;
+        budget = parseInt(paramBudget.value) || 5000;
+        if (budget < 5000) budget = 5000;
+        if (budget > 15000) budget = 15000;
+      }
+
+      if (solvers.length === 0) {
+        alert("Please select at least one algorithm.");
+        loader.style.display = 'none';
+        return;
+      }
+
+      fetch('/run-analysis', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          unique_filename: currentFile.unique_filename,
+          solvers: solvers,
+          runs: runs,
+          budget: budget,
+          seed: 1000
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        loader.style.display = 'none';
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        analysisResults = data;
+        displayResults();
+
+        document.getElementById('status-text').innerText = "Analysis Complete";
+        document.getElementById('status-dot').style.backgroundColor = "var(--accent-success)";
+        document.getElementById('status-dot').style.boxShadow = "0 0 8px var(--accent-success)";
+      })
+      .catch(err => {
+        loader.style.display = 'none';
+        alert("Execution Error: " + err.message);
+        document.getElementById('status-text').innerText = "Execution Failed";
+        document.getElementById('status-dot').style.backgroundColor = "var(--accent-error)";
+        document.getElementById('status-dot').style.boxShadow = "0 0 8px var(--accent-error)";
+      });
+    });
+
+    function displayResults() {
+      if (!analysisResults) return;
+
+      // 1. Populate summary statistics table
+      resultsTableBody.innerHTML = "";
+      Object.keys(analysisResults.summary).forEach(name => {
+        const stats = analysisResults.summary[name];
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td class="bold-white">${name.replace('_', ' ')}</td>
+          <td>${stats.best_fitness.toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
+          <td>${stats.mean_fitness.toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
+          <td>${stats.std_fitness.toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
+          <td>${stats.mean_hard_violations.toFixed(2)}</td>
+          <td>${stats.mean_soft_penalty.toFixed(2)}</td>
+          <td>${stats.feasibility_rate.toFixed(1)}%</td>
+          <td>${stats.mean_time_sec.toFixed(2)}s</td>
+        `;
+        resultsTableBody.appendChild(row);
+      });
+
+      // 2. Parse and show discussion markdown
+      explanationContent.innerHTML = marked.parse(analysisResults.explanation);
+
+      noResultsPanel.style.display = 'none';
+      resultsPanel.style.display = 'block';
+
+      // 3. Update comparison plots (adding a timestamp query parameter to bypass browser caching)
+      const t = new Date().getTime();
+      document.getElementById('chart-boxplot').src = `/static/plots/boxplot.png?t=${t}`;
+      document.getElementById('chart-convergence').src = `/static/plots/convergence.png?t=${t}`;
+      document.getElementById('chart-runtime').src = `/static/plots/runtime.png?t=${t}`;
+      document.getElementById('chart-tradeoff').src = `/static/plots/tradeoff.png?t=${t}`;
+
+      noChartsPanel.style.display = 'none';
+      chartsPanel.style.display = 'block';
+
+      // 4. Update Timetable View
+      setupTimetableView();
+    }
+
+    let selectedSolver = "";
+
+    function setupTimetableView() {
+      if (!analysisResults || !analysisResults.timetables) return;
+
+      // Populate solvers dropdown
+      timetableSolverSelect.innerHTML = "";
+      const solvers = Object.keys(analysisResults.timetables);
+      solvers.forEach(solver => {
+        const opt = document.createElement('option');
+        opt.value = solver;
+        opt.innerText = solver.replace('_', ' ');
+        timetableSolverSelect.appendChild(opt);
+      });
+
+      // Default to best solver
+      selectedSolver = analysisResults.best_solver || solvers[0] || "";
+      timetableSolverSelect.value = selectedSolver;
+
+      // Populate rooms based on the selected solver's timetable
+      populateRoomDropdown();
+
+      timetableSolverSelect.onchange = () => {
+        selectedSolver = timetableSolverSelect.value;
+        populateRoomDropdown();
+      };
+    }
+
+    function populateRoomDropdown() {
+      if (!analysisResults || !analysisResults.timetables || !selectedSolver) return;
+      const timetable = analysisResults.timetables[selectedSolver] || [];
+      
+      const rooms = [...new Set(timetable.map(a => a.room))].sort((a, b) => {
+        return a.localeCompare(b, undefined, {numeric: true, sensitivity: 'base'});
+      });
+
+      roomSelect.innerHTML = "";
+      rooms.forEach(room => {
+        const opt = document.createElement('option');
+        opt.value = room;
+        opt.innerText = `Room ${room}`;
+        roomSelect.appendChild(opt);
+      });
+
+      selectedRoom = rooms[0] || "";
+      
+      // Update metadata
+      const solverStats = analysisResults.summary[selectedSolver];
+      const fitnessDisplay = solverStats ? solverStats.best_fitness.toLocaleString(undefined, {maximumFractionDigits: 0}) : "N/A";
+      const hardDisplay = solverStats ? solverStats.mean_hard_violations.toFixed(1) : "N/A";
+      scheduleMeta.innerText = `Solver Fitness: ${fitnessDisplay} | Mean Hard Violations: ${hardDisplay}`;
+
+      noTimetablePanel.style.display = 'none';
+      timetablePanel.style.display = 'block';
+
+      renderTimetableGrid();
+    }
+
+    roomSelect.onchange = () => {
+      selectedRoom = roomSelect.value;
+      renderTimetableGrid();
+    };
+
+    function renderTimetableGrid() {
+      if (!analysisResults || !analysisResults.timetables || !selectedSolver) return;
+
+      const gridTableBody = document.querySelector('#timetable-grid-table tbody');
+      gridTableBody.innerHTML = "";
+
+      const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+      
+      // Detect days and periods per day dynamically from the current dataset
+      const timetable = analysisResults.timetables[selectedSolver] || [];
+      let maxDay = 4;
+      let maxSlot = 8;
+      
+      timetable.forEach(a => {
+        if (a.day > maxDay) maxDay = a.day;
+        if (a.slot > maxSlot) maxSlot = a.slot;
+      });
+      
+      const numDays = maxDay + 1;
+      const numPeriods = maxSlot + 1;
+      
+      // Adjust table headers dynamically
+      const headerRow = document.querySelector('#timetable-grid-table thead tr');
+      headerRow.innerHTML = "<th>Day</th>";
+      for (let p = 0; p < numPeriods; p++) {
+        const th = document.createElement('th');
+        th.innerText = `Period ${p + 1}`;
+        headerRow.appendChild(th);
+      }
+
+      // Filter assignments for selected room
+      const roomAssignments = timetable.filter(a => a.room === selectedRoom);
+
+      for (let d = 0; d < numDays; d++) {
+        const row = document.createElement('tr');
+        
+        // Day Header Column
+        const dayHeader = document.createElement('td');
+        dayHeader.className = "period-header bold-white";
+        dayHeader.innerText = days[d] || `Day ${d + 1}`;
+        row.appendChild(dayHeader);
+
+        // Period Assignment Columns
+        for (let p = 0; p < numPeriods; p++) {
+          const cell = document.createElement('td');
+          cell.className = "schedule-cell empty";
+          cell.innerText = "-";
+
+          const assignment = roomAssignments.find(a => a.day === d && a.slot === p);
+          if (assignment) {
+            cell.className = "schedule-cell occupied";
+            cell.innerText = assignment.course;
+            cell.setAttribute('title', `Course: ${assignment.course}\nEvent: ${assignment.event_index}\nRoom: ${assignment.room}\nTimeslot: ${assignment.period}`);
+          }
+          
+          row.appendChild(cell);
+        }
+        gridTableBody.appendChild(row);
+      }
+    }
+  </script>
+</body>
+</html>
